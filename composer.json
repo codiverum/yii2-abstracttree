@@ -1,0 +1,21 @@
+{
+    "name": "codiverum/yii2-abstract-tree",
+    "description": "Extension contains abstract classes to provide base for hierarchical data",
+    "type": "yii2-extension",
+    "keywords": ["yii2","extension"," codiverum"," hierarchy"," hierarchical"," tree"," node"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CodiVerum",
+            "email": "info@cv.pl"
+        }
+    ],
+    "require": {
+        "yiisoft/yii2": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "codiverum\\abstracttree\\": ""
+        }
+    }
+}
