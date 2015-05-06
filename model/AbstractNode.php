@@ -20,26 +20,29 @@ abstract class AbstractNode extends Model implements TreeNodeInterface {
 
     public abstract function getNodeTableName();
 
+    public abstract function getNodeAncestorClass();
+    
     /**
      * @return \yii\db\ActiveQuery
      */
     public function getParent() {
-        return $this->hasOne(Category::className(), ['id' => 'id_parent_' . $this->getNodeTableName()]);
+        return $this->hasOne(static::className(), ['id' => 'id_parent_' . $this->getNodeTableName()]);
     }
 
     /**
      * @return \yii\db\ActiveQuery
      */
     public function getChildren() {
-        return $this->hasMany(Category::className(), ['id_parent_' . $this->getNodeTableName() => 'id']);
+        return $this->hasMany(static::className(), ['id_parent_' . $this->getNodeTableName() => 'id']);
     }
 
     /**
      * @return \yii\db\ActiveQuery
      */
     public function getAncestors() {
-        return $this->hasMany(Category::className(), ['id' => 'id_' . $this->getNodeTableName()])
-                        ->viaTable(CategoryAncestor::tableName(), ['id_ancestor_' . $this->getNodeTableName(), 'id']);
+        $nodeAncestorClass = $this->getNodeAncestorClass();
+        return $this->hasMany(static::className(), ['id' => 'id_' . $this->getNodeTableName()])
+                        ->viaTable($nodeAncestorClass::tableName(), ['id_ancestor_' . $this->getNodeTableName(), 'id']);
     }
 
     /**
@@ -47,7 +50,7 @@ abstract class AbstractNode extends Model implements TreeNodeInterface {
      */
     public function getSiblings() {
         $propertyName = 'id_parent_' . $this->getNodeTableName();
-        return Category::find()->andWhere(['id_parent_' . $this->getNodeTableName() => $this->$propertyName]);
+        return static::find()->andWhere(['id_parent_' . $this->getNodeTableName() => $this->$propertyName]);
     }
 
 }
