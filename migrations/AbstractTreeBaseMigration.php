@@ -18,14 +18,21 @@ use yii\db\Schema;
  */
 abstract class AbstractTreeBaseMigration extends Migration {
 
-    public function getNodeTableName() {
-        return 'node';
-    }
+    /**
+     * @return name of the node table (eg. node or category)
+     */
+    public abstract function getNodeTableName();
 
+    /**
+     * @return node ancestor link table (defaults to getNodeTableName()."_ancestor")
+     */
     public function getNodeAncestorTableName() {
         return $this->getNodeTableName() . '_ancestor';
     }
 
+    /**
+     * @return array[] array of extra columns in node table
+     */
     public abstract function getExtraNodeTableColumns();
 
     public function up() {
@@ -40,7 +47,6 @@ abstract class AbstractTreeBaseMigration extends Migration {
         $nodeColumns = [
             'id' => Schema::TYPE_PK,
             'id_parent_' . $nodeTableName => Schema::TYPE_INTEGER . ' DEFAULT NULL',
-            $nodeTableName . '_level' => Schema::TYPE_SMALLINT
         ];
         $nodeColumns = array_merge($nodeColumns, $this->getExtraNodeTableColumns());
 
@@ -53,6 +59,9 @@ abstract class AbstractTreeBaseMigration extends Migration {
         $this->addIndexesAndKeys();
     }
 
+    /**
+     * Adds indexes and keys (primary and foreign)
+     */
     protected function addIndexesAndKeys() {
         $nodeName = $this->getNodeTableName();
         $nodeKeyName = str_replace("_", "", $nodeName);
