@@ -14,10 +14,6 @@ namespace codiverum\abstracttree\components\interfaces;
  */
 interface TreeNodeInterface {
 
-    public function remove($removeDescendants = true);
-
-    public function move($idNewParent, $moveDescendants = true);
-
     public function getParent();
 
     public function getAncestors();

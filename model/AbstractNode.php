@@ -21,14 +21,23 @@ use yii\db\ActiveRecord;
  */
 abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
 
-    public function save($runValidation = true, $attributeNames = null, $subtreeFollowsChanges = true) {
+    /**
+     * Saves the current model
+     * @param boolean $runValidation whether to perform validation before saving the record.
+     * If the validation fails, the record will not be saved to database.
+     * @param array $attributeNames list of attribute names that need to be saved. Defaults to null,
+     * meaning all attributes that are loaded from DB will be saved.
+     * @param boolean $withSubtree whether subtree sticks to model (e.g. if model parent is changes - should subtree follow model or stay with model's parent)
+     * @return boolean whether the saving succeeds
+     */
+    public function save($runValidation = true, $attributeNames = null, $withSubtree = true) {
         $transaction = $this->getDb()->beginTransaction();
         try {
             $result = false;
             if ($this->isNewRecord && parent::save($runValidation, $attributeNames) && $this->setAncestorsLinks()) {
                 $result = true;
             } else
-            if ($this->getDirtyParentId() > 0 && $this->{$this->getIdParentAttribute()} != $this->getDirtyParentId() && $this->prepareParentChange($subtreeFollowsChanges) && parent::save($runValidation, $attributeNames)) {
+            if ($this->getDirtyParentId() > 0 && $this->{$this->getIdParentAttribute()} != $this->getDirtyParentId() && $this->prepareParentChange($withSubtree) && parent::save($runValidation, $attributeNames)) {
                 $result = true;
             }
 
@@ -45,7 +54,27 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         }
     }
 
-    public function delete($withSubtree) {
+    /**
+     * Deletes the table row corresponding to this active record.
+     *
+     * This method performs the following steps in order:
+     *
+     * 1. call [[beforeDelete()]]. If the method returns false, it will skip the
+     *    rest of the steps;
+     * 2. delete the record from the database;
+     * 3. call [[afterDelete()]].
+     *
+     * In the above step 1 and 3, events named [[EVENT_BEFORE_DELETE]] and [[EVENT_AFTER_DELETE]]
+     * will be raised by the corresponding methods.
+     *
+     * @param boolean $withSubtree whether subtree should be deleted with model or simply attach to model's parent
+     * @return integer|false the number of rows deleted, or false if the deletion is unsuccessful for some reason.
+     * Note that it is possible the number of rows deleted is 0, even though the deletion execution is successful.
+     * @throws StaleObjectException if [[optimisticLock|optimistic locking]] is enabled and the data
+     * being deleted is outdated.
+     * @throws \Exception in case delete failed.
+     */
+    public function delete($withSubtree = false) {
         if ($this->getChildren()->count() == 0)
             return parent::delete();
 
@@ -186,7 +215,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
     public function getAncestorsIds() {
         $sql = "SELECT " . $this->getLinkIdAncestorAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
-                . " WHERE " . $this->getLinkIdCurrentAttribute() = " :id";
+                . " WHERE " . $this->getLinkIdCurrentAttribute() . "= :id";
         return $this->getDb()
                         ->createCommand($sql)
                         ->bindValue(":id", $this->id, PDO::PARAM_INT)
@@ -196,7 +225,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
     public function getDescendantsIds() {
         $sql = "SELECT " . $this->getLinkIdCurrentAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
-                . " WHERE " . $this->getLinkIdAncestorAttribute() = " :id";
+                . " WHERE " . $this->getLinkIdAncestorAttribute() . "= :id";
         return $this->getDb()
                         ->createCommand($sql)
                         ->bindValue(":id", $this->id, PDO::PARAM_INT)
