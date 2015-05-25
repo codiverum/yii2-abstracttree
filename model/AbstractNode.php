@@ -46,6 +46,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         $transaction = $this->getDb()->beginTransaction();
         try {
             $result = false;
+            $this->isNewRecord = true;
             if ($this->isNewRecord && parent::save($runValidation, $attributeNames) && $this->setAncestorsLinks()) {
                 $result = true;
             } else
@@ -274,11 +275,19 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
             $sql = "INSERT INTO " . $this->getNodeAncestorTableName()
                     . " ($id_curr, $id_ancestor) "
                     . " (SELECT :id, $id_ancestor FROM $ancestorTblName "
-                    . " WHERE $id_curr = " . $this->{$this->getIdParentAttribute()};
-            return $this->getDb()
-                            ->createCommand($sql)
-                            ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                            ->execute();
+                    . " WHERE $id_curr = :idParent)";
+            $this->getDb()
+                    ->createCommand($sql)
+                    ->bindValue(":idParent", $this->{$this->getIdParentAttribute()}, PDO::PARAM_INT)
+                    ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                    ->execute();
+            $sql = "INSERT INTO " . $this->getNodeAncestorTableName()
+                    . " ($id_curr, $id_ancestor) VALUES(:id, :idParent)";
+            $this->getDb()
+                    ->createCommand($sql)
+                    ->bindValue(":idParent", $this->{$this->getIdParentAttribute()}, PDO::PARAM_INT)
+                    ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                    ->execute();
         }
 
         return true;
