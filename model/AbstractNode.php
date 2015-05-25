@@ -16,6 +16,7 @@ use yii\db\ActiveQuery;
 use yii\db\ActiveRecord;
 use yii\db\Exception;
 use yii\db\StaleObjectException;
+use yii\helpers\ArrayHelper;
 
 /**
  * Description of Node
@@ -46,11 +47,11 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         $transaction = $this->getDb()->beginTransaction();
         try {
             $result = false;
-            $this->isNewRecord = true;
-            if ($this->isNewRecord && parent::save($runValidation, $attributeNames) && $this->setAncestorsLinks()) {
-                $result = true;
-            } else
-            if ($this->getDirtyParentId() > 0 && $this->{$this->getIdParentAttribute()} != $this->getDirtyParentId() && $this->prepareParentChange($withSubtree) && parent::save($runValidation, $attributeNames)) {
+            if ($this->isNewRecord) {
+                if (parent::save($runValidation, $attributeNames) && $this->setAncestorsLinks()) {
+                    $result = true;
+                }
+            } else if ($this->{$this->getIdParentAttribute()} != $this->getOldParentId() && $this->prepareParentChange($withSubtree) && parent::save($runValidation, $attributeNames)) {
                 $result = true;
             }
 
@@ -63,7 +64,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
             }
         } catch (Exception $e) {
             $transaction->rollBack();
-            return false;
+            throw $e;
         }
     }
 
@@ -108,7 +109,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
             }
         } catch (Exception $e) {
             $transaction->rollBack();
-            return false;
+            throw $e;
         }
     }
 
@@ -218,31 +219,34 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
 
     public function getLevel() {
         $sql = "SELECT COUNT(" . $this->getLinkIdAncestorAttribute() . ") "
+                . " FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdCurrentAttribute() . " = :id";
         return $this->getDb()
                         ->createCommand($sql)
                         ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->queryScalar();
+                        ->queryScalar()+1;
     }
 
     public function getAncestorsIds() {
         $sql = "SELECT " . $this->getLinkIdAncestorAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdCurrentAttribute() . "= :id";
-        return $this->getDb()
-                        ->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->queryAll();
+        $res = $this->getDb()
+                ->createCommand($sql)
+                ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                ->queryAll();
+        return ArrayHelper::getColumn($res, $this->getLinkIdAncestorAttribute());
     }
 
     public function getDescendantsIds() {
         $sql = "SELECT " . $this->getLinkIdCurrentAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdAncestorAttribute() . "= :id";
-        return $this->getDb()
-                        ->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->queryAll();
+        $res = $this->getDb()
+                ->createCommand($sql)
+                ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                ->queryAll();
+        return ArrayHelper::getColumn($res, $this->getLinkIdCurrentAttribute());
     }
 
     public function removeDescendants() {
@@ -257,9 +261,9 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
 
     protected function prepareParentChange($withSubtree) {
         if ($withSubtree) {
-            return $this->removeMyAncestorsFromMyDescendants() && $this->removeAncestorsLinks() && $this->setAncestorsLinks($this->getDirtyParentId()) && $this->setMyAncestorsToMyDescendants();
+            return $this->removeMyAncestorsFromMyDescendants() && $this->removeAncestorsLinks() && $this->setAncestorsLinks() && $this->setMyAncestorsToMyDescendants();
         } else {
-            return $this->changeMyChildrensParentToMyParent($this->getDirtyParentId()) && $this->removeMeAsMyDescendantsAncestor();
+            return $this->changeMyChildrensParentToMyParent($this->getOldParentId()) && $this->removeMeAsMyDescendantsAncestor();
         }
     }
 
@@ -296,18 +300,22 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
     protected function removeAncestorsLinks() {
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdCurrentAttribute() . " = :id";
-        return $this->getDb()->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->execute();
+        $this->getDb()->createCommand($sql)
+                ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                ->execute();
+        return true;
     }
 
     protected function removeMyAncestorsFromMyDescendants() {
         $ancestorIds = implode(",", $this->getAncestorsIds());
         $descentantsIds = implode(", ", $this->getDescendantsIds());
+        if (empty($descentantsIds) || empty($ancestorIds))
+            return true;
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdAncestorAttribute() . " IN ($ancestorIds)"
                 . " AND " . $this->getLinkIdCurrentAttribute() . " IN ($descentantsIds)";
-        return $this->getDb()->createCommand($sql)->execute();
+        $this->getDb()->createCommand($sql)->execute();
+        return true;
     }
 
     protected function setMyAncestorsToMyDescendants() {
@@ -320,10 +328,11 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
                 . "JOIN "
                 . "(SELECT $id_node, $id_anc_node FROM $anc_tbl WHERE $id_anc_node = :id) mydesc "
                 . "ON (myanc.$id_node = mydesc.$id_node))";
-        return $this->getDb()
-                        ->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->execute();
+        $this->getDb()
+                ->createCommand($sql)
+                ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                ->execute();
+        return true;
     }
 
     protected function changeMyChildrensParentToGrandparent($idGrandparent) {
@@ -337,9 +346,10 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
     protected function removeMeAsMyDescendantsAncestor() {
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdAncestorAttribute() . " = :id";
-        return $this->getDb()->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->execute();
+        $this->getDb()->createCommand($sql)
+                ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                ->execute();
+        return true;
     }
 
     protected function getLinkIdCurrentAttribute() {
@@ -350,10 +360,10 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         return "id_ancestor_" . $this->tableName();
     }
 
-    protected function getDirtyParentId() {
+    protected function getOldParentId() {
         $idParentAttribute = $this->getIdParentAttribute();
-        if (isset($this->dirtyAttributes) && isset($this->dirtyAttributes[$idParentAttribute]))
-            return $this->dirtyAttributes[$idParentAttribute];
+        if (isset($this->oldAttributes) && isset($this->oldAttributes[$idParentAttribute]))
+            return $this->oldAttributes[$idParentAttribute];
         else
             return false;
     }

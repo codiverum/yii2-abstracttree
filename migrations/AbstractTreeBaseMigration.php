@@ -67,7 +67,7 @@ abstract class AbstractTreeBaseMigration extends Migration {
         $nodeKeyName = str_replace("_", "", $nodeName);
         $nodeAncestorName = $this->getNodeAncestorTableName();
         $nodeAncestorKeyName = str_replace("_", "", $nodeAncestorName);
-        $this->createIndex('unique_node', $nodeName, ['id', 'id_parent_' . $nodeName], true);
+        $this->createIndex('unique_node', $nodeName, ['name', 'id_parent_' . $nodeName], true);
         $this->addForeignKey("fk_{$nodeKeyName}_parent{$nodeKeyName}", $nodeName, 'id_parent_' . $nodeName, $nodeName, 'id', 'SET NULL', 'CASCADE');
         $this->addPrimaryKey('pk_' . $nodeKeyName . 'ancestor', $nodeAncestorName, ['id_' . $nodeName, 'id_ancestor_' . $nodeName]);
         $this->addForeignKey('fk_' . $nodeAncestorKeyName . '_' . $nodeKeyName, $nodeAncestorName, 'id_'.$nodeName, $nodeName, 'id', 'CASCADE', 'CASCADE');
