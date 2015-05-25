@@ -9,10 +9,13 @@
 namespace codiverum\abstracttree\model;
 
 use codiverum\abstracttree\components\interfaces\TreeNodeInterface;
+use Exception as Exception2;
 use PDO;
-use Yii;
+use yii\behaviors\TimestampBehavior;
 use yii\db\ActiveQuery;
 use yii\db\ActiveRecord;
+use yii\db\Exception;
+use yii\db\StaleObjectException;
 
 /**
  * Description of Node
@@ -20,6 +23,15 @@ use yii\db\ActiveRecord;
  * @author jozek
  */
 abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
+
+    /**
+     * @inheritdoc
+     */
+    public function behaviors() {
+        return [
+            TimestampBehavior::className(),
+        ];
+    }
 
     /**
      * Saves the current model
@@ -72,7 +84,7 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
      * Note that it is possible the number of rows deleted is 0, even though the deletion execution is successful.
      * @throws StaleObjectException if [[optimisticLock|optimistic locking]] is enabled and the data
      * being deleted is outdated.
-     * @throws \Exception in case delete failed.
+     * @throws Exception2 in case delete failed.
      */
     public function delete($withSubtree = false) {
         if ($this->getChildren()->count() == 0)
