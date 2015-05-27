@@ -47,6 +47,7 @@ abstract class AbstractTreeBaseMigration extends Migration {
         $nodeColumns = [
             'id' => Schema::TYPE_PK,
             'id_parent_' . $nodeTableName => Schema::TYPE_INTEGER . ' DEFAULT NULL',
+            $nodeTableName.'_level' => Schema::TYPE_INTEGER . ' NOT NULL',
         ];
         $nodeColumns = array_merge($nodeColumns, $this->getExtraNodeTableColumns());
 
@@ -70,7 +71,7 @@ abstract class AbstractTreeBaseMigration extends Migration {
         $this->createIndex('unique_node', $nodeName, ['name', 'id_parent_' . $nodeName], true);
         $this->addForeignKey("fk_{$nodeKeyName}_parent{$nodeKeyName}", $nodeName, 'id_parent_' . $nodeName, $nodeName, 'id', 'SET NULL', 'CASCADE');
         $this->addPrimaryKey('pk_' . $nodeKeyName . 'ancestor', $nodeAncestorName, ['id_' . $nodeName, 'id_ancestor_' . $nodeName]);
-        $this->addForeignKey('fk_' . $nodeAncestorKeyName . '_' . $nodeKeyName, $nodeAncestorName, 'id_'.$nodeName, $nodeName, 'id', 'CASCADE', 'CASCADE');
+        $this->addForeignKey('fk_' . $nodeAncestorKeyName . '_' . $nodeKeyName, $nodeAncestorName, 'id_' . $nodeName, $nodeName, 'id', 'CASCADE', 'CASCADE');
         $this->addForeignKey('fk_' . $nodeAncestorKeyName . '_ancestor', $nodeAncestorName, 'id_ancestor_' . $nodeName, $nodeName, 'id', 'CASCADE', 'CASCADE');
     }
 

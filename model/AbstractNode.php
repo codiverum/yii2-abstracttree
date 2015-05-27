@@ -48,7 +48,9 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         try {
             $result = false;
             if ($this->isNewRecord) {
-                if (parent::save($runValidation, $attributeNames) && $this->setAncestorsLinks()) {
+                $this->setNodeLevel($this->calculateLevel());
+                if (parent::save($runValidation, $attributeNames)) {
+                    $this->setAncestorsLinks();
                     $result = true;
                 }
             } else if ($this->{$this->getIdParentAttribute()} != $this->getOldParentId() && $this->prepareParentChange($withSubtree) && parent::save($runValidation, $attributeNames)) {
@@ -142,6 +144,14 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
     }
 
     /**
+     * Returns node level attribute name
+     * @return string
+     */
+    public function getNodeLevelAttribute() {
+        return $this->tableName() . "_level";
+    }
+
+    /**
      * @return ActiveQuery
      */
     public function getParent() {
@@ -160,45 +170,42 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
      */
     public function getAncestors() {
         return $this->hasMany(static::className(), ['id' => $this->getLinkIdAncestorAttribute()])
-                        ->viaTable($this->getNodeAncestorTableName(), [$this->getLinkIdCurrentAttribute(), 'id']);
+                        ->from(['ancestors' => static::tableName()])
+                        ->viaTable($this->getNodeAncestorTableName(), [$this->getLinkIdCurrentAttribute() => 'id']);
     }
 
     /**
      * @param integer $distance
-     * @return $this
+     * @return ActiveQuery
      */
     public function getAncestorByDistance($distance) {
-        $ancestorIds = $this->getAncestorsIds();
         $linkIdCurrent = $this->getLinkIdCurrentAttribute();
-        $levelWanted = count($ancestorIds) - $distance;
+        $currLevel = $this->{$this->getNodeLevelAttribute()};
+        $levelWanted = $currLevel - $distance;
         if ($levelWanted <= 0)
             return null;
-        $sql = "SELECT $linkIdCurrent"
-                . " FROM " . $this->getNodeAncestorTableName()
-                . " WHERE $linkIdCurrent IN (" . implode(",", $ancestorIds) . ") "
-                . " GROUP BY $linkIdCurrent "
-                . " HAVING COUNT(" . $this->getLinkIdAncestorAttribute() . ") = :levelWanted";
-        $id = $this->getDb()->createCommand($sql)->bindValue(':levelWanted', $levelWanted, PDO::PARAM_INT)->queryScalar();
-        return static::findOne($id);
+
+        return static::find()
+                        ->joinWith(['ancestors'])
+                        ->andWhere([$this->getNodeLevelAttribute() => $levelWanted])
+                        ->andWhere([$this->getNodeAncestorTableName() . ".$linkIdCurrent" => $this->id]);
     }
 
     /**
      * @param integer $distance
-     * @return $this
+     * @return ActiveQuery
      */
-    public function getDescendantByDistance($distance) {
-        $ancestorIds = $this->getDescendantsIds();
-        $linkIdCurrent = $this->getLinkIdCurrentAttribute();
-        $levelWanted = count($ancestorIds) + $level;
+    public function getDescendantsByDistance($distance) {
+        $linkIdAncestor = $this->getLinkIdAncestorAttribute();
+        $currLevel = $this->{$this->getNodeLevelAttribute()};
+        $levelWanted = $currLevel - $distance;
         if ($levelWanted <= 0)
             return null;
-        $sql = "SELECT $linkIdCurrent"
-                . " FROM " . $this->getNodeAncestorTableName()
-                . " WHERE $linkIdCurrent IN (" . implode(",", $ancestorIds) . ") "
-                . " GROUP BY $linkIdCurrent "
-                . " HAVING COUNT(" . $this->getLinkIdAncestorAttribute() . ") = :levelWanted";
-        $id = $this->getDb()->createCommand($sql)->bindValue(':levelWanted', $levelWanted, PDO::PARAM_INT)->queryScalar();
-        return static::findOne($id);
+
+        return static::find()
+                        ->joinWith(['ancestors'])
+                        ->andWhere([$this->getNodeLevelAttribute() => $levelWanted])
+                        ->andWhere([$this->getNodeAncestorTableName() . ".$linkIdAncestor" => $this->id]);
     }
 
     /**
@@ -217,16 +224,10 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         return static::find()->andWhere(['id_parent_' . $this->tableName() => $this->$propertyName]);
     }
 
-    public function getLevel() {
-        $sql = "SELECT COUNT(" . $this->getLinkIdAncestorAttribute() . ") "
-                . " FROM " . $this->getNodeAncestorTableName()
-                . " WHERE " . $this->getLinkIdCurrentAttribute() . " = :id";
-        return $this->getDb()
-                        ->createCommand($sql)
-                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                        ->queryScalar()+1;
-    }
-
+    /**
+     * 
+     * @return int[] Ancestor ids
+     */
     public function getAncestorsIds() {
         $sql = "SELECT " . $this->getLinkIdAncestorAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
@@ -238,6 +239,10 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         return ArrayHelper::getColumn($res, $this->getLinkIdAncestorAttribute());
     }
 
+    /**
+     * 
+     * @return int[] Descentands ids
+     */
     public function getDescendantsIds() {
         $sql = "SELECT " . $this->getLinkIdCurrentAttribute()
                 . " FROM " . $this->getNodeAncestorTableName()
@@ -249,6 +254,10 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         return ArrayHelper::getColumn($res, $this->getLinkIdCurrentAttribute());
     }
 
+    /**
+     * 
+     * @return integer number of rows affected
+     */
     public function removeDescendants() {
         $sql = "DELETE n FROM " . $this->tableName()
                 . " n JOIN " . $this->getNodeAncestorTableName() . " na "
@@ -259,17 +268,30 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
                         ->execute();
     }
 
+    /**
+     * 
+     * @param boolean $withSubtree whether subtree should follow changes
+     * @return boolean
+     */
     protected function prepareParentChange($withSubtree) {
+        $this->setNodeLevel($this->calculateLevel());
         if ($withSubtree) {
-            return $this->removeMyAncestorsFromMyDescendants() && $this->removeAncestorsLinks() && $this->setAncestorsLinks() && $this->setMyAncestorsToMyDescendants();
+            $this->removeMyAncestorsFromMyDescendants();
+            $this->removeAncestorsLinks();
+            $this->setAncestorsLinks();
+            $this->setMyAncestorsToMyDescendants();
+            $this->changeDescendantsLevel($this->calculateLevelChange());
+            return true;
         } else {
-            return $this->changeMyChildrensParentToMyParent($this->getOldParentId()) && $this->removeMeAsMyDescendantsAncestor();
+            $this->changeMyChildrensParentToMyParent($this->getOldParentId());
+            $this->removeMeAsMyDescendantsAncestor();
+            $this->changeDescendantsLevel(-1);
+            return true;
         }
     }
 
     /**
      * 
-     * @return boolean whether ancestor linked correctly
      */
     protected function setAncestorsLinks() {
         if ($this->{$this->getIdParentAttribute()} > 0) {
@@ -293,19 +315,23 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
                     ->bindValue(":id", $this->id, PDO::PARAM_INT)
                     ->execute();
         }
-
-        return true;
     }
 
+    /**
+     * @return integer number of rows affected
+     */
     protected function removeAncestorsLinks() {
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdCurrentAttribute() . " = :id";
-        $this->getDb()->createCommand($sql)
-                ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                ->execute();
-        return true;
+        return $this->getDb()->createCommand($sql)
+                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                        ->execute();
     }
 
+    /**
+     * 
+     * @return integer number of rows affected
+     */
     protected function removeMyAncestorsFromMyDescendants() {
         $ancestorIds = implode(",", $this->getAncestorsIds());
         $descentantsIds = implode(", ", $this->getDescendantsIds());
@@ -314,10 +340,13 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdAncestorAttribute() . " IN ($ancestorIds)"
                 . " AND " . $this->getLinkIdCurrentAttribute() . " IN ($descentantsIds)";
-        $this->getDb()->createCommand($sql)->execute();
-        return true;
+        return $this->getDb()->createCommand($sql)->execute();
     }
 
+    /**
+     * 
+     * @return integer number of rows affected
+     */
     protected function setMyAncestorsToMyDescendants() {
         $id_node = $this->getLinkIdCurrentAttribute();
         $id_anc_node = $this->getLinkIdAncestorAttribute();
@@ -327,14 +356,17 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
                 . "(SELECT $id_node, $id_anc_node FROM $anc_tbl WHERE $id_node = :id) myanc "
                 . "JOIN "
                 . "(SELECT $id_node, $id_anc_node FROM $anc_tbl WHERE $id_anc_node = :id) mydesc "
-                . "ON (myanc.$id_node = mydesc.$id_node))";
-        $this->getDb()
-                ->createCommand($sql)
-                ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                ->execute();
-        return true;
+                . "ON (myanc.$id_node = mydesc.$id_anc_node))";
+        return $this->getDb()
+                        ->createCommand($sql)
+                        ->bindValue(":id", $this->id, PDO::PARAM_INT);
     }
 
+    /**
+     * 
+     * @param integer $idGrandparent
+     * @return integer number of rows affected
+     */
     protected function changeMyChildrensParentToGrandparent($idGrandparent) {
         $sql = "UPDATE " . $this->tableName() . " SET " . $this->getIdParentAttribute() . " = :id_parent WHERE " . $this->getIdParentAttribute() . " = :id";
         return $this->getDb()->createCommand($sql)
@@ -343,29 +375,89 @@ abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
                         ->execute();
     }
 
+    /**
+     * 
+     * @return integer number of rows affected
+     */
     protected function removeMeAsMyDescendantsAncestor() {
         $sql = "DELETE FROM " . $this->getNodeAncestorTableName()
                 . " WHERE " . $this->getLinkIdAncestorAttribute() . " = :id";
-        $this->getDb()->createCommand($sql)
-                ->bindValue(":id", $this->id, PDO::PARAM_INT)
-                ->execute();
-        return true;
+        return $this->getDb()->createCommand($sql)
+                        ->bindValue(":id", $this->id, PDO::PARAM_INT)
+                        ->execute();
     }
 
+    /**
+     * 
+     * @return string
+     */
     protected function getLinkIdCurrentAttribute() {
         return "id_" . $this->tableName();
     }
 
+    /**
+     * 
+     * @return string
+     */
     protected function getLinkIdAncestorAttribute() {
         return "id_ancestor_" . $this->tableName();
     }
 
+    /**
+     * 
+     * @return integer|null
+     */
     protected function getOldParentId() {
         $idParentAttribute = $this->getIdParentAttribute();
         if (isset($this->oldAttributes) && isset($this->oldAttributes[$idParentAttribute]))
             return $this->oldAttributes[$idParentAttribute];
         else
-            return false;
+            return null;
+    }
+
+    /**
+     * 
+     * @param integer $level
+     */
+    protected function setNodeLevel($level) {
+        $this->{$this->getNodeLevelAttribute()} = $level;
+    }
+
+    /**
+     * 
+     * @return int calculated level
+     */
+    protected function calculateLevel() {
+        if ($this->{$this->getIdParentAttribute()} > 0) {
+            return $this->getParent()->one()->{$this->getNodeLevelAttribute()} + 1;
+        } else
+            return 0;
+    }
+
+    /**
+     * 
+     * @return int calculated level change distance
+     */
+    protected function calculateLevelChange() {
+        $oldLevel = ArrayHelper::getValue($this->oldAttributes, $this->getNodeLevelAttribute(), 0);
+        return $this->calculateLevel() - $oldLevel;
+    }
+
+    /**
+     * Changes descendants level by specified distance
+     * @param integer $distance 1 adds one to all descendant's level
+     * @return integer number of rows affected
+     */
+    protected function changeDescendantsLevel($distance) {
+        $nLvlAttr = $this->getNodeLevelAttribute();
+        $sql = "UPDATE {$this->tableName()} n JOIN {$this->getNodeAncestorTableName()} na "
+                . " ON (n.id = na.{$this->getLinkIdCurrentAttribute()})"
+                . " SET n.$nLvlAttr = n.$nLvlAttr + ($distance)"
+                . " WHERE na.{$this->getLinkIdAncestorAttribute()} = :id";
+        return $this->getDb()
+                        ->createCommand($sql)
+                        ->bindValue(':id', $this->id, PDO::PARAM_INT)
+                        ->execute();
     }
 
 }
