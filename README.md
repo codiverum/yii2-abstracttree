@@ -52,9 +52,8 @@ Usage
 -----
 
 Using this extension you can easily make:
-- customized migration 
-- ActiveRecord classes 
-- node interface (TreeNodeInterface)
+  - customized migration 
+  - ready to use ActiveRecord classes 
 
 #### Migration ####
 To make migration, you should create new migration:
