@@ -42,7 +42,7 @@ php composer.phar require --prefer-dist codiverum/yii2-abstract-tree "*"
 or add
 
 ```
-"codiverum/yii2-abstract-tree": "*"
+"codiverum/yii2-abstracttree": "*"
 ```
 
 to the require section of your `composer.json` file.
@@ -56,7 +56,7 @@ Using this extension you can easily make:
 - ActiveRecord classes 
 - node interface (TreeNodeInterface)
 
-### Migration ###
+#### Migration ####
 To make migration, you should create new migration:
 
 ```
@@ -96,6 +96,8 @@ Then apply migration using command:
 ```
 yii migrate
 ```
+
+#### Models ####
 
 Generate pivot table using Gii and you can leave it as is.
 After that you can use Gii to generate Model for the main table or write it on you're own. Just make sure
