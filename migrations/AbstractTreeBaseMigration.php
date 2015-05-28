@@ -19,7 +19,11 @@ use yii\db\Schema;
 abstract class AbstractTreeBaseMigration extends Migration {
 
     /**
-     * @return name of the node table (eg. node or category)
+     * String returned will replace all `node` occurs. For example, returning *category* 
+     * will result in creating `category` and `category_ancestor` tables.
+     * Column names will also be affected by this - there would be `id_parent_category` instead of `id_parent_node`
+     * for above example.
+     * @return string name of the node table (eg. node or category)
      */
     public abstract function getNodeTableName();
 
