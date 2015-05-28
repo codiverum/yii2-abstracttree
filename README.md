@@ -36,7 +36,7 @@ The preferred way to install this extension is through [composer](http://getcomp
 Either run
 
 ```
-php composer.phar require --prefer-dist codiverum/yii2-abstract-tree "*"
+php composer.phar require --prefer-dist codiverum/yii2-abstracttree "*"
 ```
 
 or add
