@@ -104,10 +104,20 @@ yii migrate
 #### Models ####
 
 Generate pivot table using Gii and you can leave it as is.
-After that you can use Gii to generate Model for the main table or write it on you're own. Just make sure
-your Model is extending `AbstractNode` class.
-If you did - you can delete relations created for default columns (not in `getExtraNodeTablesColumns`)
+After that you can use Gii to generate model for the main table or write it on you're own. Just make sure
+your class is extending `AbstractNode` class.
+If you did - you can delete relations created for default columns (not in `getExtraNodeTablesColumns` migration method)
 as they are already coverd in `AbstractNode` class.
+You may want to add to the description of your class:
+
+~~~php
+ * @property Category $parent
+ * @property Category[] $ancestors
+ * @property Category[] $descendants
+ * @property Category[] $children
+ * @property Category[] $siblings
+~~~
+
 For migration example above, `Category` class would look like this:
 
 ~~~php
@@ -132,10 +142,10 @@ use common\models\User;
  *
  * @property User $userCreated
  * @property Category $parent
- * @property Category[] $children
- * @property Category[] $siblings
  * @property Category[] $ancestors
  * @property Category[] $descendants
+ * @property Category[] $children
+ * @property Category[] $siblings
  */
 class Category extends AbstractNode implements TreeNodeInterface {
 
