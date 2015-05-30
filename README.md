@@ -108,7 +108,7 @@ After that you can use Gii to generate model for the main table or write it on y
 your class is extending `AbstractNode` class.
 If you did - you can delete relations created for default columns (not in `getExtraNodeTablesColumns` migration method)
 as they are already coverd in `AbstractNode` class.
-You may want to add to the description of your class:
+You may want to add to the description of your class (use your model class name instead of `Category`):
 
 ~~~php
  * @property Category $parent
