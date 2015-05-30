@@ -12,7 +12,7 @@ use codiverum\abstracttree\model\AbstractNode;
 
 /**
  *
- * @author jozek
+ * @author CodiVerum
  */
 interface TreeNodeInterface {
 

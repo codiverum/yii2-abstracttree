@@ -1,10 +1,15 @@
 CodiVerum Yii2 Extension for hierarchy data
 ========================================
 Extension contains abstract classes making it easy to implement tree-structured data in Yii2 Framework.
-I've found other solutions implementing tree structured data but I wasn't satisfy by them so 
+It has what's needed in hierarchical data:
+  - multiple root nodes
+  - selecting parent, children, siblings, ancestors, descendants (also by distance); easy for programmer and also for DBMS.
+  - modifying trees like adding nodes, removing nodes and moving nodes (with or without subtree); simple (it's based on `id_parent` value changes - all the work is done by `AbstractNode` class)
+
+I have found other solutions implementing tree structured data (like nested sets)
+but I don't like using recursion or subqueries for frequent queries like selecting data.
 I created my own way (I haven't found that kind of solution).
-It allows for adding nodes, removing nodes, moving nodes (with or without subtree), 
-getting ancestors, descendants, siblings etc. (see TreeNodeInterface)
+
 I hope you'll find it useful and easy.
 
 This is my first open-source work so I'll be glad to hear any suggestions.
@@ -127,9 +132,10 @@ use common\models\User;
  *
  * @property User $userCreated
  * @property Category $parent
- * @property Category[] $ancestors
  * @property Category[] $children
  * @property Category[] $siblings
+ * @property Category[] $ancestors
+ * @property Category[] $descendants
  */
 class Category extends AbstractNode implements TreeNodeInterface {
 

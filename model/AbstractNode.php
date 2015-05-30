@@ -21,7 +21,7 @@ use yii\helpers\ArrayHelper;
 /**
  * Description of Node
  *
- * @author jozek
+ * @author CodiVerum
  */
 abstract class AbstractNode extends ActiveRecord implements TreeNodeInterface {
 
