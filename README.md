@@ -124,7 +124,7 @@ For migration example above, `Category` class would look like this:
 namespace common\models;
 
 use codiverum\abstracttree\components\interfaces\TreeNodeInterface;
-use codiverum\abstracttree\model\AbstractNode;
+use codiverum\abstracttree\models\AbstractNode;
 use Yii;
 use yii\db\ActiveQuery;
 use common\models\User;

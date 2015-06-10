@@ -6,7 +6,7 @@
  * and open the template in the editor.
  */
 
-namespace codiverum\abstracttree\model;
+namespace codiverum\abstracttree\models;
 
 use codiverum\abstracttree\components\interfaces\TreeNodeInterface;
 use Exception as Exception2;

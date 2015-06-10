@@ -8,7 +8,7 @@
 
 namespace codiverum\abstracttree\components\interfaces;
 
-use codiverum\abstracttree\model\AbstractNode;
+use codiverum\abstracttree\models\AbstractNode;
 
 /**
  *
@@ -17,7 +17,7 @@ use codiverum\abstracttree\model\AbstractNode;
 interface TreeNodeInterface {
 
     /**
-     * @return AbstractNode[]
+     * @return ActiveQuery
      */
     public function getAncestors();
 
@@ -27,22 +27,22 @@ interface TreeNodeInterface {
     public function getAncestorsIds();
 
     /**
-     * @return AbstractNode
+     * @return ActiveQuery
      */
     public function getParent();
 
     /**
-     * @return AbstractNode[]
+     * @return ActiveQuery
      */
     public function getChildren();
 
     /**
-     * @return AbstractNode[]
+     * @return ActiveQuery
      */
     public function getSiblings();
 
     /**
-     * @return AbstractNode[]
+     * @return ActiveQuery
      */
     public function getDescendants();
 
@@ -58,13 +58,13 @@ interface TreeNodeInterface {
 
     /**
      * @param integer $distance
-     * @return AbstractNode
+     * @return ActiveQuery
      */
     public function getAncestorByDistance($distance);
 
     /**
      * @param integer $distance
-     * @return AbstractNode[]
+     * @return ActiveQuery
      */
     public function getDescendantsByDistance($distance);
 }
