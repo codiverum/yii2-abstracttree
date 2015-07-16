@@ -81,6 +81,7 @@ abstract class AbstractTreeBaseMigration extends Migration {
     public function down() {
         $this->dropTable($this->getNodeAncestorTableName());
         $this->dropTable($this->getNodeTableName());
+        return true;
     }
 
 }
